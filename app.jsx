@@ -387,6 +387,50 @@ const CartContext = createContext();
 const ThemeContext = createContext();
 const WishlistContext = createContext();
 const AuthContext = createContext();
+const CurrencyContext = createContext();
+
+// =============================================
+// CURRENCY PROVIDER
+// =============================================
+const EXCHANGE_RATE = 0.029; // 1 THB = 0.029 USD
+
+function CurrencyProvider({ children }) {
+  const [currency, setCurrency] = useState('THB');
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
+  const formatPrice = (priceInTHB) => {
+    if (currency === 'USD') {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+      }).format(priceInTHB * EXCHANGE_RATE);
+    }
+    return new Intl.NumberFormat('th-TH', {
+      style: 'currency',
+      currency: 'THB',
+    }).format(priceInTHB);
+  };
+
+  const toggleCurrency = (cur) => {
+    setCurrency(cur);
+    setIsDropdownOpen(false);
+  };
+
+  return (
+    <CurrencyContext.Provider
+      value={{
+        currency,
+        setCurrency,
+        formatPrice,
+        isDropdownOpen,
+        setIsDropdownOpen,
+        toggleCurrency,
+      }}
+    >
+      {children}
+    </CurrencyContext.Provider>
+  );
+}
 
 // =============================================
 // AUTH PROVIDER
@@ -698,10 +742,6 @@ function Hero() {
       </div>
       <div className="hero-overlay" />
       <div className="hero-content">
-        <div className="hero-badge">
-          <span>✨</span>
-          <span>New Collection 2026</span>
-        </div>
         <h1 className="hero-title">MAISON</h1>
         <p className="hero-subtitle">Premium Lifestyle Wear</p>
         <div className="hero-buttons">
@@ -831,6 +871,7 @@ const newArrivalsData = [
 // =============================================
 function SizeSelectionModal({ product, onClose, onAddToCart }) {
   const [selectedSize, setSelectedSize] = useState(null);
+  const { formatPrice } = useContext(CurrencyContext);
   
   // Parse sizes from the product's size string
   const getSizes = () => {
@@ -842,13 +883,6 @@ function SizeSelectionModal({ product, onClose, onAddToCart }) {
   };
   
   const sizes = getSizes();
-
-  const formatPrice = (price) => {
-    return new Intl.NumberFormat("th-TH", {
-      style: "currency",
-      currency: "THB",
-    }).format(price);
-  };
 
   const handleOverlayClick = (e) => {
     if (e.target.classList.contains("size-modal-overlay")) {
@@ -934,6 +968,7 @@ function SizeSelectionModal({ product, onClose, onAddToCart }) {
 // =============================================
 function NewArrivalCard({ product }) {
   const { addToCart } = useContext(CartContext);
+  const { formatPrice } = useContext(CurrencyContext);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
   const [showSizeModal, setShowSizeModal] = useState(false);
@@ -950,13 +985,6 @@ function NewArrivalCard({ product }) {
     setCurrentImageIndex((prev) => 
       prev === 0 ? product.images.length - 1 : prev - 1
     );
-  };
-
-  const formatPrice = (price) => {
-    return new Intl.NumberFormat("th-TH", {
-      style: "currency",
-      currency: "THB",
-    }).format(price);
   };
 
   const handleAddToCartClick = (e) => {
@@ -1107,17 +1135,17 @@ function Footer() {
             ด้วยการออกแบบที่เรียบง่ายแต่หรูหรา
           </p>
           <div className="footer-social">
-            <a href="#" className="social-icon">
-              📘
+            <a href="#" className="social-icon" title="Facebook">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg>
             </a>
-            <a href="#" className="social-icon">
-              📷
+            <a href="#" className="social-icon" title="Instagram">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
             </a>
-            <a href="#" className="social-icon">
-              🐦
+            <a href="#" className="social-icon" title="Twitter">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
             </a>
-            <a href="#" className="social-icon">
-              📺
+            <a href="#" className="social-icon" title="YouTube">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
             </a>
           </div>
         </div>
@@ -1408,13 +1436,7 @@ function CartSidebar() {
     setIsCartOpen,
     setIsCheckoutOpen,
   } = useContext(CartContext);
-
-  const formatPrice = (price) => {
-    return new Intl.NumberFormat("th-TH", {
-      style: "currency",
-      currency: "THB",
-    }).format(price);
-  };
+  const { formatPrice } = useContext(CurrencyContext);
 
   if (!isCartOpen) return null;
 
@@ -2732,10 +2754,10 @@ function SearchModal({ onClose, onSearch }) {
           <div className="search-popular">
             <p className="suggestions-title">Popular Categories</p>
             <div className="popular-tags">
-              <button onClick={() => { onSearch('Jeans'); onClose(); }}>👖 Jeans</button>
-              <button onClick={() => { onSearch('Sunglasses'); onClose(); }}>🕶️ Sunglasses</button>
-              <button onClick={() => { onSearch('Jacket'); onClose(); }}>🧥 Jacket</button>
-              <button onClick={() => { onSearch('Jordan'); onClose(); }}>👟 Jordan</button>
+              <button onClick={() => { onSearch('Jeans'); onClose(); }}>◆ Jeans</button>
+              <button onClick={() => { onSearch('Sunglasses'); onClose(); }}>◎ Sunglasses</button>
+              <button onClick={() => { onSearch('Jacket'); onClose(); }}>◇ Jacket</button>
+              <button onClick={() => { onSearch('Jordan'); onClose(); }}>★ Jordan</button>
             </div>
           </div>
         )}
@@ -2957,6 +2979,7 @@ function App() {
 
   return (
     <ThemeProvider>
+      <CurrencyProvider>
       <CartProvider>
       <WishlistProvider>
       <AuthProvider>
@@ -3014,6 +3037,7 @@ function App() {
       </AuthProvider>
       </WishlistProvider>
       </CartProvider>
+      </CurrencyProvider>
     </ThemeProvider>
   );
 }
@@ -3028,6 +3052,7 @@ function NavbarWithPages({ currentPage, onNavigate, onNavigateCategory, onShowSe
   const { toggleTheme, isDark } = useContext(ThemeContext);
   const { wishlistCount, setIsWishlistOpen } = useContext(WishlistContext);
   const { isLoggedIn, openAuthModal, user } = useContext(AuthContext);
+  const { currency, toggleCurrency, isDropdownOpen, setIsDropdownOpen } = useContext(CurrencyContext);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 50);
@@ -3054,18 +3079,52 @@ function NavbarWithPages({ currentPage, onNavigate, onNavigateCategory, onShowSe
         </div>
         
         <div className="main-nav-right">
-          <button className="nav-icon lang-btn" title="Language">
-            🌐 <span className="lang-text">TH ▾</span>
-          </button>
+          <div className="currency-selector">
+            <button 
+              className="nav-icon currency-btn" 
+              title="Currency"
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="2" y1="12" x2="22" y2="12"/>
+                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+              </svg>
+              <span className="currency-text">{currency === 'THB' ? '฿ THB' : '$ USD'} ▾</span>
+            </button>
+            {isDropdownOpen && (
+              <div className="currency-dropdown">
+                <button 
+                  className={`currency-option ${currency === 'THB' ? 'active' : ''}`}
+                  onClick={() => toggleCurrency('THB')}
+                >
+                  <span className="currency-symbol">฿</span>
+                  <span className="currency-name">THB - Thai Baht</span>
+                </button>
+                <button 
+                  className={`currency-option ${currency === 'USD' ? 'active' : ''}`}
+                  onClick={() => toggleCurrency('USD')}
+                >
+                  <span className="currency-symbol">$</span>
+                  <span className="currency-name">USD - US Dollar</span>
+                </button>
+              </div>
+            )}
+          </div>
           <button className="nav-icon" title="Search" onClick={onShowSearch}>
-            🔍
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8"/>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
           </button>
           <button
             className="nav-icon wishlist-btn"
             title="Wishlist"
             onClick={() => setIsWishlistOpen(true)}
           >
-            ❤️
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+            </svg>
             {wishlistCount > 0 && <span className="wishlist-badge">{wishlistCount}</span>}
           </button>
           <button
@@ -3073,7 +3132,10 @@ function NavbarWithPages({ currentPage, onNavigate, onNavigateCategory, onShowSe
             title={isLoggedIn ? `Hi, ${user.firstName}` : 'Account'}
             onClick={() => openAuthModal('menu')}
           >
-            👤
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+              <circle cx="12" cy="7" r="4"/>
+            </svg>
             {isLoggedIn && <span className="login-indicator"></span>}
           </button>
           <button
@@ -3081,7 +3143,11 @@ function NavbarWithPages({ currentPage, onNavigate, onNavigateCategory, onShowSe
             onClick={() => setIsCartOpen(true)}
             title="Cart"
           >
-            🛒
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="9" cy="21" r="1"/>
+              <circle cx="20" cy="21" r="1"/>
+              <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+            </svg>
             {cartCount > 0 && <span className="cart-badge">{cartCount}</span>}
           </button>
           <button
@@ -3129,7 +3195,7 @@ function NavbarWithPages({ currentPage, onNavigate, onNavigateCategory, onShowSe
           }}
           className="sale-link"
         >
-          🔥 FINAL SALE
+          ◆ FINAL SALE
         </a>
         <a
           href="#"
@@ -3139,7 +3205,7 @@ function NavbarWithPages({ currentPage, onNavigate, onNavigateCategory, onShowSe
           }}
           className="wishlist-link"
         >
-          ❤️ WISHLIST
+          ♥ WISHLIST
         </a>
         <a href="#about">ABOUT US</a>
         <a
@@ -3159,13 +3225,13 @@ function NavbarWithPages({ currentPage, onNavigate, onNavigateCategory, onShowSe
         <div className="mobile-menu-overlay" onClick={() => setMenuOpen(false)}>
           <div className="mobile-menu" onClick={(e) => e.stopPropagation()}>
             <button className="mobile-menu-close" onClick={() => setMenuOpen(false)}>×</button>
-            <a href="#" onClick={(e) => { e.preventDefault(); onNavigate("home"); setMenuOpen(false); }}>🏠 HOME</a>
-            <a href="#" onClick={(e) => { e.preventDefault(); onNavigate("gallery"); setMenuOpen(false); }}>👗 WOMENS</a>
-            <a href="#" onClick={(e) => { e.preventDefault(); onNavigate("gallery"); setMenuOpen(false); }}>👔 MENS</a>
-            <a href="#" onClick={(e) => { e.preventDefault(); onNavigate("gallery"); setMenuOpen(false); }}>🏷️ BRANDS</a>
-            <a href="#" onClick={(e) => { e.preventDefault(); onNavigate("gallery"); setMenuOpen(false); }}>🔥 FINAL SALE</a>
-            <a href="#about" onClick={() => setMenuOpen(false)}>ℹ️ ABOUT US</a>
-            <a href="#" onClick={(e) => { e.preventDefault(); onShowRegistration(); setMenuOpen(false); }}>📞 CONTACT US</a>
+            <a href="#" onClick={(e) => { e.preventDefault(); onNavigate("home"); setMenuOpen(false); }}>⌂ HOME</a>
+            <a href="#" onClick={(e) => { e.preventDefault(); onNavigate("gallery"); setMenuOpen(false); }}>◈ WOMENS</a>
+            <a href="#" onClick={(e) => { e.preventDefault(); onNavigate("gallery"); setMenuOpen(false); }}>◆ MENS</a>
+            <a href="#" onClick={(e) => { e.preventDefault(); onNavigate("gallery"); setMenuOpen(false); }}>⬡ BRANDS</a>
+            <a href="#" onClick={(e) => { e.preventDefault(); onNavigate("gallery"); setMenuOpen(false); }}>★ FINAL SALE</a>
+            <a href="#about" onClick={() => setMenuOpen(false)}>◉ ABOUT US</a>
+            <a href="#" onClick={(e) => { e.preventDefault(); onShowRegistration(); setMenuOpen(false); }}>✉ CONTACT US</a>
           </div>
         </div>
       )}
