@@ -927,6 +927,57 @@ const newArrivalsData = [
 ];
 
 // =============================================
+// FINAL SALE PRODUCTS DATA (20% OFF)
+// =============================================
+const saleProductsData = [
+  {
+    id: 201,
+    name: "Vintage Denim Jacket",
+    originalPrice: 5990.00,
+    price: 4792.00, // 20% off
+    size: "S, M, L, XL",
+    stock: 5,
+    images: [
+      "https://assets.jadedldn.com/image/upload/e_sharpen:50,w_1000,c_limit/shopi///cdn/shop/files/JADEDMAN23MAY73480.jpg",
+      "https://assets.jadedldn.com/image/upload/e_sharpen:50,w_1000,c_limit/shopi///cdn/shop/files/JMJK4056_F1_0725.jpg",
+      "https://assets.jadedldn.com/image/upload/e_sharpen:50,w_1000,c_limit/shopi///cdn/shop/files/JMDJ6064_F1_1125.jpg"
+    ],
+    discount: 20,
+    description: "เสื้อแจ็คเก็ตยีนส์วินเทจสไตล์"
+  },
+  {
+    id: 202,
+    name: "Premium Leather Belt",
+    originalPrice: 2490.00,
+    price: 1992.00, // 20% off
+    size: "S, M, L",
+    stock: 8,
+    images: [
+      "https://assets.jadedldn.com/image/upload/e_sharpen:50,w_1600,c_limit/shopi///cdn/shop/files/JMA6231_F1_0925.jpg?v=1760096508",
+      "https://assets.jadedldn.com/image/upload/e_sharpen:50,w_1000,c_limit/shopi///cdn/shop/files/JMA6231_F1_0925edited.jpg",
+      "https://assets.jadedldn.com/image/upload/e_sharpen:50,w_1000,c_limit/shopi///cdn/shop/files/FLAT6.jpg"
+    ],
+    discount: 20,
+    description: "เข็มขัดหนังพรีเมี่ยมคุณภาพสูง"
+  },
+  {
+    id: 203,
+    name: "Oversized Graphic Tee",
+    originalPrice: 1890.00,
+    price: 1512.00, // 20% off
+    size: "M, L, XL, XXL",
+    stock: 12,
+    images: [
+      "https://assets.jadedldn.com/image/upload/e_sharpen:50,w_1600,c_limit/shopi///cdn/shop/files/15JANWWECCOM1292.jpg?v=1737996348",
+      "https://assets.jadedldn.com/image/upload/e_sharpen:50,w_1000,c_limit/shopi///cdn/shop/files/Artboard1_a7af62d9-1df2-4e06-a649-003dee60d630.jpg",
+      "https://assets.jadedldn.com/image/upload/e_sharpen:50,w_1000,c_limit/shopi///cdn/shop/files/JMT6381_3.jpg"
+    ],
+    discount: 20,
+    description: "เสื้อยืดโอเวอร์ไซส์กราฟิก"
+  }
+];
+
+// =============================================
 // SIZE SELECTION MODAL COMPONENT
 // =============================================
 function SizeSelectionModal({ product, onClose, onAddToCart }) {
@@ -1131,6 +1182,130 @@ function NewArrivals() {
       <div className="arrivals-grid">
         {newArrivalsData.map((product) => (
           <NewArrivalCard key={product.id} product={product} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// =============================================
+// SALE PRODUCT CARD COMPONENT
+// =============================================
+function SaleProductCard({ product }) {
+  const { addToCart } = useContext(CartContext);
+  const { formatPrice } = useContext(CurrencyContext);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [isHovered, setIsHovered] = useState(false);
+  const [showSizeModal, setShowSizeModal] = useState(false);
+
+  const nextImage = (e) => {
+    e.stopPropagation();
+    setCurrentImageIndex((prev) => 
+      prev === product.images.length - 1 ? 0 : prev + 1
+    );
+  };
+
+  const prevImage = (e) => {
+    e.stopPropagation();
+    setCurrentImageIndex((prev) => 
+      prev === 0 ? product.images.length - 1 : prev - 1
+    );
+  };
+
+  const handleAddToCartClick = (e) => {
+    e.stopPropagation();
+    setShowSizeModal(true);
+  };
+
+  return (
+    <>
+      <div 
+        className="sale-product-card"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      >
+        <div className="sale-product-image">
+          <img 
+            src={product.images[currentImageIndex]} 
+            alt={product.name} 
+          />
+          <span className="sale-discount-tag">-{product.discount}%</span>
+          
+          {isHovered && product.images.length > 1 && (
+            <>
+              <button className="carousel-arrow left" onClick={prevImage}>
+                ‹
+              </button>
+              <button className="carousel-arrow right" onClick={nextImage}>
+                ›
+              </button>
+            </>
+          )}
+          
+          <div className="image-dots">
+            {product.images.map((_, index) => (
+              <span 
+                key={index} 
+                className={`dot ${index === currentImageIndex ? 'active' : ''}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCurrentImageIndex(index);
+                }}
+              />
+            ))}
+          </div>
+          
+          <button 
+            className="sale-add-to-cart"
+            onClick={handleAddToCartClick}
+          >
+            Add to Cart
+          </button>
+        </div>
+        <div className="sale-product-info">
+          <h3 className="sale-product-name">{product.name}</h3>
+          <p className="sale-product-desc">{product.description}</p>
+          <div className="sale-price-container">
+            <span className="sale-original-price">{formatPrice(product.originalPrice)}</span>
+            <span className="sale-discounted-price">{formatPrice(product.price)}</span>
+          </div>
+        </div>
+      </div>
+      
+      {showSizeModal && (
+        <SizeSelectionModal
+          product={product}
+          onClose={() => setShowSizeModal(false)}
+          onAddToCart={addToCart}
+        />
+      )}
+    </>
+  );
+}
+
+// =============================================
+// FINAL SALE PAGE COMPONENT
+// =============================================
+function FinalSalePage({ onBack }) {
+  return (
+    <section className="final-sale-page">
+      <div className="sale-page-header">
+        <button className="back-button" onClick={onBack}>
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="15 18 9 12 15 6"/>
+          </svg>
+          Back
+        </button>
+        <div className="sale-banner">
+          <span className="sale-badge">FINAL SALE</span>
+          <h1 className="sale-title">🔥 Special Discount 20% OFF 🔥</h1>
+          <p className="sale-subtitle">สินค้าลดราคาพิเศษ จำนวนจำกัด!</p>
+        </div>
+      </div>
+      
+      <div className="sale-products-grid">
+        {saleProductsData.map((product) => (
+          <SaleProductCard key={product.id} product={product} />
         ))}
       </div>
     </section>
@@ -3203,6 +3378,10 @@ function App() {
             />
           )}
 
+          {currentPage === "sale" && (
+            <FinalSalePage onBack={() => navigateTo("home")} />
+          )}
+
           <Footer onNavigate={navigateTo} />
 
           {activeModal && (
@@ -3382,7 +3561,7 @@ function NavbarWithPages({ currentPage, onNavigate, onNavigateCategory, onShowSe
           href="#"
           onClick={(e) => {
             e.preventDefault();
-            onNavigateCategory("all");
+            onNavigate("sale");
           }}
           className="sale-link"
         >
@@ -3432,7 +3611,7 @@ function NavbarWithPages({ currentPage, onNavigate, onNavigateCategory, onShowSe
               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight: '12px', verticalAlign: 'middle'}}><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
               BRANDS
             </a>
-            <a href="#" onClick={(e) => { e.preventDefault(); onNavigateCategory("all"); setMenuOpen(false); }}>
+            <a href="#" onClick={(e) => { e.preventDefault(); onNavigate("sale"); setMenuOpen(false); }}>
               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight: '12px', verticalAlign: 'middle'}}><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
               FINAL SALE
             </a>
