@@ -4367,6 +4367,72 @@ body {
   color: var(--accent-dark);
 }
 
+/* Auth Divider */
+.auth-divider {
+  display: flex;
+  align-items: center;
+  margin: 25px 0;
+  gap: 15px;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.auth-divider span {
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* Google Sign-In Button */
+.google-signin-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 14px 24px;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.google-signin-btn:hover {
+  background: #f5f5f5;
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="dark"] .google-signin-btn {
+  background: #2d2d2d;
+  border-color: #444;
+  color: #fff;
+}
+
+[data-theme="dark"] .google-signin-btn:hover {
+  background: #3d3d3d;
+}
+
+/* Auth Loading State */
+.auth-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  font-size: 18px;
+  color: var(--text-secondary);
+}
+
 /* Login Indicator */
 .account-btn.logged-in {
   position: relative;

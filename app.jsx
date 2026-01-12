@@ -493,58 +493,148 @@ function CurrencyProvider({ children }) {
 }
 
 // =============================================
-// AUTH PROVIDER
+// AUTH PROVIDER (Firebase)
 // =============================================
 function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
-  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState('menu'); // 'menu', 'login', 'register'
   const [authError, setAuthError] = useState('');
 
-  const register = (userData) => {
-    // Check if username already exists
-    const existingUser = users.find(u => u.username === userData.username);
-    if (existingUser) {
-      setAuthError('Username already exists!');
-      return false;
-    }
-    // Check if email already exists
-    const existingEmail = users.find(u => u.email === userData.email);
-    if (existingEmail) {
-      setAuthError('Email already registered!');
-      return false;
-    }
-    
-    const newUser = {
-      id: Date.now(),
-      ...userData,
-      createdAt: new Date().toISOString()
-    };
-    setUsers(prev => [...prev, newUser]);
-    setUser(newUser);
-    setAuthError('');
-    setIsAuthModalOpen(false);
-    return true;
-  };
+  // Listen to Firebase auth state changes
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
+      if (firebaseUser) {
+        // Get additional user data from Firestore
+        try {
+          const userDoc = await db.collection('users').doc(firebaseUser.uid).get();
+          if (userDoc.exists) {
+            setUser({
+              id: firebaseUser.uid,
+              email: firebaseUser.email,
+              ...userDoc.data()
+            });
+          } else {
+            // User exists in Auth but not in Firestore (e.g., Google sign-in first time)
+            setUser({
+              id: firebaseUser.uid,
+              email: firebaseUser.email,
+              firstName: firebaseUser.displayName?.split(' ')[0] || 'User',
+              lastName: firebaseUser.displayName?.split(' ')[1] || ''
+            });
+          }
+        } catch (error) {
+          console.error("Error fetching user data:", error);
+          setUser({
+            id: firebaseUser.uid,
+            email: firebaseUser.email,
+            firstName: 'User'
+          });
+        }
+      } else {
+        setUser(null);
+      }
+      setLoading(false);
+    });
 
-  const login = (username, password) => {
-    const foundUser = users.find(
-      u => u.username === username && u.password === password
-    );
-    if (foundUser) {
-      setUser(foundUser);
+    return () => unsubscribe();
+  }, []);
+
+  const register = async (userData) => {
+    try {
       setAuthError('');
+      // Create user with email and password
+      const userCredential = await auth.createUserWithEmailAndPassword(
+        userData.email,
+        userData.password
+      );
+      
+      // Save additional user data to Firestore
+      await db.collection('users').doc(userCredential.user.uid).set({
+        firstName: userData.firstName,
+        lastName: userData.lastName,
+        email: userData.email,
+        phone: userData.phone || '',
+        address: userData.address || '',
+        otherInfo: userData.otherInfo || '',
+        username: userData.username,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+
       setIsAuthModalOpen(false);
       return true;
-    } else {
-      setAuthError('Invalid username or password!');
+    } catch (error) {
+      console.error("Registration error:", error);
+      if (error.code === 'auth/email-already-in-use') {
+        setAuthError('อีเมลนี้ถูกใช้งานแล้ว!');
+      } else if (error.code === 'auth/weak-password') {
+        setAuthError('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร!');
+      } else if (error.code === 'auth/invalid-email') {
+        setAuthError('รูปแบบอีเมลไม่ถูกต้อง!');
+      } else {
+        setAuthError('เกิดข้อผิดพลาด: ' + error.message);
+      }
       return false;
     }
   };
 
-  const logout = () => {
-    setUser(null);
+  const login = async (email, password) => {
+    try {
+      setAuthError('');
+      await auth.signInWithEmailAndPassword(email, password);
+      setIsAuthModalOpen(false);
+      return true;
+    } catch (error) {
+      console.error("Login error:", error);
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+        setAuthError('อีเมลหรือรหัสผ่านไม่ถูกต้อง!');
+      } else if (error.code === 'auth/invalid-email') {
+        setAuthError('รูปแบบอีเมลไม่ถูกต้อง!');
+      } else {
+        setAuthError('เกิดข้อผิดพลาด: ' + error.message);
+      }
+      return false;
+    }
+  };
+
+  const loginWithGoogle = async () => {
+    try {
+      setAuthError('');
+      const provider = new firebase.auth.GoogleAuthProvider();
+      const result = await auth.signInWithPopup(provider);
+      
+      // Check if user exists in Firestore, if not create one
+      const userDoc = await db.collection('users').doc(result.user.uid).get();
+      if (!userDoc.exists) {
+        await db.collection('users').doc(result.user.uid).set({
+          firstName: result.user.displayName?.split(' ')[0] || 'User',
+          lastName: result.user.displayName?.split(' ').slice(1).join(' ') || '',
+          email: result.user.email,
+          phone: '',
+          address: '',
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      }
+      
+      setIsAuthModalOpen(false);
+      return true;
+    } catch (error) {
+      console.error("Google login error:", error);
+      if (error.code !== 'auth/popup-closed-by-user') {
+        setAuthError('เกิดข้อผิดพลาดในการเข้าสู่ระบบด้วย Google');
+      }
+      return false;
+    }
+  };
+
+  const logout = async () => {
+    try {
+      await auth.signOut();
+      setUser(null);
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
   };
 
   const isLoggedIn = !!user;
@@ -561,6 +651,10 @@ function AuthProvider({ children }) {
     setAuthError('');
   };
 
+  if (loading) {
+    return <div className="auth-loading">Loading...</div>;
+  }
+
   return (
     <AuthContext.Provider
       value={{
@@ -568,6 +662,7 @@ function AuthProvider({ children }) {
         isLoggedIn,
         register,
         login,
+        loginWithGoogle,
         logout,
         isAuthModalOpen,
         setIsAuthModalOpen,
@@ -585,22 +680,68 @@ function AuthProvider({ children }) {
 }
 
 // =============================================
-// WISHLIST PROVIDER
+// WISHLIST PROVIDER (Firebase)
 // =============================================
 function WishlistProvider({ children }) {
   const [wishlist, setWishlist] = useState([]);
   const [isWishlistOpen, setIsWishlistOpen] = useState(false);
+  const { user } = useContext(AuthContext);
+
+  // Load wishlist from Firestore when user logs in
+  useEffect(() => {
+    if (user?.id) {
+      const unsubscribe = db.collection('wishlists').doc(user.id)
+        .onSnapshot((doc) => {
+          if (doc.exists) {
+            setWishlist(doc.data().items || []);
+          } else {
+            setWishlist([]);
+          }
+        }, (error) => {
+          console.error("Error loading wishlist:", error);
+        });
+      
+      return () => unsubscribe();
+    } else {
+      setWishlist([]);
+    }
+  }, [user?.id]);
+
+  // Save wishlist to Firestore
+  const saveWishlistToFirestore = async (items) => {
+    if (user?.id) {
+      try {
+        await db.collection('wishlists').doc(user.id).set({
+          items: items,
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      } catch (error) {
+        console.error("Error saving wishlist:", error);
+      }
+    }
+  };
 
   const addToWishlist = (product) => {
     setWishlist((prev) => {
       const exists = prev.find((item) => item.id === product.id);
       if (exists) return prev;
-      return [...prev, product];
+      const newWishlist = [...prev, {
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        image: product.image || product.images?.[0]
+      }];
+      saveWishlistToFirestore(newWishlist);
+      return newWishlist;
     });
   };
 
   const removeFromWishlist = (productId) => {
-    setWishlist((prev) => prev.filter((item) => item.id !== productId));
+    setWishlist((prev) => {
+      const newWishlist = prev.filter((item) => item.id !== productId);
+      saveWishlistToFirestore(newWishlist);
+      return newWishlist;
+    });
   };
 
   const toggleWishlist = (product) => {
@@ -637,47 +778,102 @@ function WishlistProvider({ children }) {
 }
 
 // =============================================
-// CART PROVIDER
+// CART PROVIDER (Firebase)
 // =============================================
 function CartProvider({ children }) {
   const [cart, setCart] = useState([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [toast, setToast] = useState({ show: false, message: "" });
+  const { user } = useContext(AuthContext);
+
+  // Load cart from Firestore when user logs in
+  useEffect(() => {
+    if (user?.id) {
+      const unsubscribe = db.collection('carts').doc(user.id)
+        .onSnapshot((doc) => {
+          if (doc.exists) {
+            setCart(doc.data().items || []);
+          } else {
+            setCart([]);
+          }
+        }, (error) => {
+          console.error("Error loading cart:", error);
+        });
+      
+      return () => unsubscribe();
+    } else {
+      setCart([]);
+    }
+  }, [user?.id]);
+
+  // Save cart to Firestore
+  const saveCartToFirestore = async (items) => {
+    if (user?.id) {
+      try {
+        await db.collection('carts').doc(user.id).set({
+          items: items,
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      } catch (error) {
+        console.error("Error saving cart:", error);
+      }
+    }
+  };
 
   const clearCart = () => {
     setCart([]);
+    if (user?.id) {
+      saveCartToFirestore([]);
+    }
   };
 
   const addToCart = (product) => {
     setCart((prev) => {
-      const existing = prev.find((item) => item.id === product.id);
+      const existing = prev.find((item) => item.id === product.id && item.selectedSize === product.selectedSize);
+      let newCart;
       if (existing) {
-        return prev.map((item) =>
-          item.id === product.id
+        newCart = prev.map((item) =>
+          item.id === product.id && item.selectedSize === product.selectedSize
             ? { ...item, quantity: item.quantity + 1 }
             : item
         );
+      } else {
+        newCart = [...prev, {
+          id: product.id,
+          name: product.name,
+          price: product.price,
+          image: product.image || product.images?.[0],
+          selectedSize: product.selectedSize,
+          quantity: 1
+        }];
       }
-      return [...prev, { ...product, quantity: 1 }];
+      saveCartToFirestore(newCart);
+      return newCart;
     });
     showToast(`Added ${product.name} to cart!`);
   };
 
-  const removeFromCart = (productId) => {
-    setCart((prev) => prev.filter((item) => item.id !== productId));
+  const removeFromCart = (productId, selectedSize) => {
+    setCart((prev) => {
+      const newCart = prev.filter((item) => !(item.id === productId && item.selectedSize === selectedSize));
+      saveCartToFirestore(newCart);
+      return newCart;
+    });
   };
 
-  const updateQuantity = (productId, delta) => {
-    setCart((prev) =>
-      prev.map((item) => {
-        if (item.id === productId) {
+  const updateQuantity = (productId, selectedSize, delta) => {
+    setCart((prev) => {
+      const newCart = prev.map((item) => {
+        if (item.id === productId && item.selectedSize === selectedSize) {
           const newQty = Math.max(1, item.quantity + delta);
           return { ...item, quantity: newQty };
         }
         return item;
-      })
-    );
+      });
+      saveCartToFirestore(newCart);
+      return newCart;
+    });
   };
 
   const cartTotal = cart.reduce(
@@ -1881,6 +2077,7 @@ function AuthModal() {
     isLoggedIn,
     register,
     login,
+    loginWithGoogle,
     logout,
     isAuthModalOpen,
     authMode,
@@ -1890,7 +2087,7 @@ function AuthModal() {
     closeAuthModal,
   } = useContext(AuthContext);
 
-  const [loginData, setLoginData] = useState({ username: '', password: '' });
+  const [loginData, setLoginData] = useState({ email: '', password: '' });
   const [registerData, setRegisterData] = useState({
     firstName: '',
     lastName: '',
@@ -1934,19 +2131,23 @@ function AuthModal() {
     return Object.keys(errors).length === 0;
   };
 
-  const handleLoginSubmit = (e) => {
+  const handleLoginSubmit = async (e) => {
     e.preventDefault();
-    if (!loginData.username || !loginData.password) {
-      setAuthError('Please enter username and password');
+    if (!loginData.email || !loginData.password) {
+      setAuthError('กรุณากรอกอีเมลและรหัสผ่าน');
       return;
     }
-    login(loginData.username, loginData.password);
+    await login(loginData.email, loginData.password);
   };
 
-  const handleRegisterSubmit = (e) => {
+  const handleGoogleLogin = async () => {
+    await loginWithGoogle();
+  };
+
+  const handleRegisterSubmit = async (e) => {
     e.preventDefault();
     if (validateRegister()) {
-      register(registerData);
+      await register(registerData);
     }
   };
 
@@ -2011,19 +2212,19 @@ function AuthModal() {
           <div className="auth-login">
             <button className="auth-back" onClick={() => setAuthMode('menu')}>← Back</button>
             <h2 className="auth-title">Sign In</h2>
-            <p className="auth-subtitle">Enter your credentials</p>
+            <p className="auth-subtitle">กรอกอีเมลและรหัสผ่านของคุณ</p>
             
             {authError && <div className="auth-error">{authError}</div>}
             
             <form onSubmit={handleLoginSubmit} className="auth-form">
               <div className="form-group">
-                <label>Username</label>
+                <label>Email</label>
                 <input
-                  type="text"
-                  name="username"
-                  value={loginData.username}
+                  type="email"
+                  name="email"
+                  value={loginData.email}
                   onChange={handleLoginChange}
-                  placeholder="Enter username"
+                  placeholder="Enter email"
                 />
               </div>
               <div className="form-group">
@@ -2040,6 +2241,20 @@ function AuthModal() {
                 Sign In
               </button>
             </form>
+            
+            <div className="auth-divider">
+              <span>หรือ</span>
+            </div>
+            
+            <button className="google-signin-btn" onClick={handleGoogleLogin}>
+              <svg width="18" height="18" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+              </svg>
+              Sign in with Google
+            </button>
             
             <p className="auth-switch">
               Don't have an account?{' '}
