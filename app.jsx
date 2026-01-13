@@ -1761,11 +1761,14 @@ function ProductCard({ product }) {
   const { toggleWishlist, isInWishlist } = useContext(WishlistContext);
   const { isLoggedIn, openAuthModal } = useContext(AuthContext);
   const { formatPrice } = useContext(CurrencyContext);
+  const { addToCompare, isInCompare } = useContext(CompareContext);
   const [showSizeModal, setShowSizeModal] = useState(false);
   const [showReviewModal, setShowReviewModal] = useState(false);
+  const [showShareMenu, setShowShareMenu] = useState(false);
   const [selectedColorIndex, setSelectedColorIndex] = useState(0);
   
   const wishlisted = isInWishlist(product.id);
+  const inCompare = isInCompare(product.id);
   
   // Get current image based on selected color
   const hasColorVariants = product.colorVariants && product.colorVariants.length > 0;
@@ -1781,6 +1784,8 @@ function ProductCard({ product }) {
       openAuthModal('menu');
       return;
     }
+    // Add to recently viewed
+    addToRecentlyViewed({...product, image: currentImage});
     setShowSizeModal(true);
   };
 
@@ -1796,6 +1801,10 @@ function ProductCard({ product }) {
     });
   };
 
+  const handleCompareClick = () => {
+    addToCompare({...product, image: currentImage});
+  };
+
   return (
     <>
       <div className="product-card">
@@ -1808,6 +1817,29 @@ function ProductCard({ product }) {
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill={wishlisted ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
           </button>
+          {/* Quick action buttons */}
+          <div className="product-quick-actions">
+            <button 
+              className={`quick-action-btn compare ${inCompare ? 'active' : ''}`} 
+              onClick={handleCompareClick}
+              title={inCompare ? 'ในรายการเปรียบเทียบ' : 'เปรียบเทียบ'}
+            >
+              📊
+            </button>
+            <button 
+              className="quick-action-btn share" 
+              onClick={() => setShowShareMenu(!showShareMenu)}
+              title="แชร์"
+            >
+              📤
+            </button>
+          </div>
+          {/* Share dropdown */}
+          {showShareMenu && (
+            <div className="share-dropdown">
+              <ShareButtons product={{...product, image: currentImage}} />
+            </div>
+          )}
         </div>
         <div className="product-info">
           <h3 className="product-name">{product.name}</h3>
@@ -1873,6 +1905,7 @@ function ProductCard({ product }) {
     </>
   );
 }
+
 
 
 // =============================================
@@ -2253,6 +2286,316 @@ function OrderHistory({ userId }) {
         </div>
       ))}
     </div>
+  );
+}
+
+// =============================================
+// SHARE BUTTONS COMPONENT
+// =============================================
+function ShareButtons({ product, onClose }) {
+  const shareUrl = window.location.href;
+  const shareText = `${product.name} - ฿${product.price?.toLocaleString()} | MAISON Premium Lifestyle Wear`;
+  
+  const shareToFacebook = () => {
+    window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}&quote=${encodeURIComponent(shareText)}`, '_blank', 'width=600,height=400');
+  };
+  
+  const shareToLine = () => {
+    window.open(`https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}`, '_blank', 'width=600,height=400');
+  };
+  
+  const shareToTwitter = () => {
+    window.open(`https://twitter.com/intent/tweet?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}`, '_blank', 'width=600,height=400');
+  };
+  
+  const copyLink = () => {
+    navigator.clipboard.writeText(shareUrl).then(() => {
+      alert('คัดลอกลิงก์แล้ว!');
+    });
+  };
+  
+  return (
+    <div className="share-buttons">
+      <button className="share-btn facebook" onClick={shareToFacebook} title="Share to Facebook">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+      </button>
+      <button className="share-btn line" onClick={shareToLine} title="Share to Line">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63h2.386c.346 0 .627.285.627.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63.346 0 .628.285.628.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .344-.282.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314"/></svg>
+      </button>
+      <button className="share-btn twitter" onClick={shareToTwitter} title="Share to X/Twitter">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+      </button>
+      <button className="share-btn copy" onClick={copyLink} title="Copy Link">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+      </button>
+    </div>
+  );
+}
+
+// =============================================
+// FLASH SALE TIMER COMPONENT
+// =============================================
+function FlashSaleTimer({ endTime }) {
+  const [timeLeft, setTimeLeft] = useState({ hours: 0, minutes: 0, seconds: 0 });
+  const [isExpired, setIsExpired] = useState(false);
+  
+  useEffect(() => {
+    const calculateTimeLeft = () => {
+      const now = new Date().getTime();
+      const end = new Date(endTime).getTime();
+      const difference = end - now;
+      
+      if (difference <= 0) {
+        setIsExpired(true);
+        return { hours: 0, minutes: 0, seconds: 0 };
+      }
+      
+      return {
+        hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
+        minutes: Math.floor((difference / (1000 * 60)) % 60),
+        seconds: Math.floor((difference / 1000) % 60)
+      };
+    };
+    
+    setTimeLeft(calculateTimeLeft());
+    const timer = setInterval(() => {
+      setTimeLeft(calculateTimeLeft());
+    }, 1000);
+    
+    return () => clearInterval(timer);
+  }, [endTime]);
+  
+  if (isExpired) {
+    return <div className="flash-timer expired">⏰ หมดเวลาโปรโมชั่น</div>;
+  }
+  
+  return (
+    <div className="flash-timer">
+      <span className="flash-label">🔥 FLASH SALE สิ้นสุดใน</span>
+      <div className="timer-blocks">
+        <div className="timer-block">
+          <span className="timer-number">{String(timeLeft.hours).padStart(2, '0')}</span>
+          <span className="timer-label">ชม.</span>
+        </div>
+        <span className="timer-separator">:</span>
+        <div className="timer-block">
+          <span className="timer-number">{String(timeLeft.minutes).padStart(2, '0')}</span>
+          <span className="timer-label">นาที</span>
+        </div>
+        <span className="timer-separator">:</span>
+        <div className="timer-block">
+          <span className="timer-number">{String(timeLeft.seconds).padStart(2, '0')}</span>
+          <span className="timer-label">วินาที</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// =============================================
+// RECENTLY VIEWED COMPONENT
+// =============================================
+function RecentlyViewed() {
+  const [recentProducts, setRecentProducts] = useState([]);
+  const { formatPrice } = useContext(CurrencyContext);
+  
+  useEffect(() => {
+    const stored = localStorage.getItem('recentlyViewed');
+    if (stored) {
+      setRecentProducts(JSON.parse(stored));
+    }
+  }, []);
+  
+  if (recentProducts.length === 0) return null;
+  
+  return (
+    <section className="recently-viewed">
+      <div className="section-header">
+        <h2 className="section-title">👁️ สินค้าที่ดูล่าสุด</h2>
+      </div>
+      <div className="recent-products-grid">
+        {recentProducts.slice(0, 6).map((product, index) => (
+          <div key={index} className="recent-product-card">
+            <div className="recent-product-image">
+              <img src={product.image} alt={product.name} />
+            </div>
+            <div className="recent-product-info">
+              <h4>{product.name}</h4>
+              <span className="recent-product-price">{formatPrice(product.price)}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// Helper function to add product to recently viewed
+function addToRecentlyViewed(product) {
+  try {
+    const stored = localStorage.getItem('recentlyViewed');
+    let recent = stored ? JSON.parse(stored) : [];
+    
+    // Remove if already exists
+    recent = recent.filter(p => p.id !== product.id);
+    
+    // Add to beginning
+    recent.unshift({
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      image: product.image
+    });
+    
+    // Keep only last 10
+    recent = recent.slice(0, 10);
+    
+    localStorage.setItem('recentlyViewed', JSON.stringify(recent));
+  } catch (e) {
+    console.error('Error saving to recently viewed:', e);
+  }
+}
+
+// =============================================
+// PRODUCT COMPARE CONTEXT
+// =============================================
+const CompareContext = createContext();
+
+function CompareProvider({ children }) {
+  const [compareList, setCompareList] = useState([]);
+  const [isCompareOpen, setIsCompareOpen] = useState(false);
+  
+  const addToCompare = (product) => {
+    if (compareList.length >= 3) {
+      alert('สามารถเปรียบเทียบได้สูงสุด 3 รายการ');
+      return;
+    }
+    if (compareList.find(p => p.id === product.id)) {
+      alert('สินค้านี้อยู่ในรายการเปรียบเทียบแล้ว');
+      return;
+    }
+    setCompareList([...compareList, product]);
+  };
+  
+  const removeFromCompare = (productId) => {
+    setCompareList(compareList.filter(p => p.id !== productId));
+  };
+  
+  const clearCompare = () => {
+    setCompareList([]);
+  };
+  
+  const isInCompare = (productId) => {
+    return compareList.some(p => p.id === productId);
+  };
+  
+  return (
+    <CompareContext.Provider value={{
+      compareList,
+      addToCompare,
+      removeFromCompare,
+      clearCompare,
+      isInCompare,
+      isCompareOpen,
+      setIsCompareOpen,
+      compareCount: compareList.length
+    }}>
+      {children}
+    </CompareContext.Provider>
+  );
+}
+
+// =============================================
+// PRODUCT COMPARE MODAL
+// =============================================
+function ProductCompareModal() {
+  const { compareList, removeFromCompare, clearCompare, isCompareOpen, setIsCompareOpen } = useContext(CompareContext);
+  const { formatPrice } = useContext(CurrencyContext);
+  
+  useEffect(() => {
+    if (isCompareOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'auto';
+    }
+    return () => {
+      document.body.style.overflow = 'auto';
+    };
+  }, [isCompareOpen]);
+  
+  if (!isCompareOpen) return null;
+  
+  return (
+    <div className="compare-modal-overlay active" onClick={() => setIsCompareOpen(false)}>
+      <div className="compare-modal" onClick={e => e.stopPropagation()}>
+        <button className="compare-modal-close" onClick={() => setIsCompareOpen(false)}>×</button>
+        <h2 className="compare-title">📊 เปรียบเทียบสินค้า</h2>
+        
+        {compareList.length === 0 ? (
+          <div className="compare-empty">
+            <p>ยังไม่มีสินค้าในรายการเปรียบเทียบ</p>
+            <p className="compare-hint">กดปุ่ม "Compare" ที่การ์ดสินค้าเพื่อเพิ่ม</p>
+          </div>
+        ) : (
+          <div className="compare-grid" style={{ gridTemplateColumns: `repeat(${compareList.length}, 1fr)` }}>
+            {compareList.map((product) => (
+              <div key={product.id} className="compare-product">
+                <button className="compare-remove" onClick={() => removeFromCompare(product.id)}>×</button>
+                <img src={product.image} alt={product.name} className="compare-product-image" />
+                <h4 className="compare-product-name">{product.name}</h4>
+                <div className="compare-product-price">{formatPrice(product.price)}</div>
+                
+                <div className="compare-specs">
+                  <div className="compare-spec">
+                    <span className="spec-label">Model</span>
+                    <span className="spec-value">{product.model}</span>
+                  </div>
+                  <div className="compare-spec">
+                    <span className="spec-label">Size</span>
+                    <span className="spec-value">{product.size}</span>
+                  </div>
+                  <div className="compare-spec">
+                    <span className="spec-label">Material</span>
+                    <span className="spec-value">{product.material}</span>
+                  </div>
+                  <div className="compare-spec">
+                    <span className="spec-label">Color</span>
+                    <span className="spec-value">{product.color}</span>
+                  </div>
+                  <div className="compare-spec">
+                    <span className="spec-label">Stock</span>
+                    <span className="spec-value">{product.stock} ชิ้น</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        
+        {compareList.length > 0 && (
+          <button className="compare-clear-btn" onClick={clearCompare}>
+            🗑️ ล้างรายการ
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// =============================================
+// COMPARE FLOATING BUTTON
+// =============================================
+function CompareFloatingButton() {
+  const { compareCount, setIsCompareOpen } = useContext(CompareContext);
+  
+  if (compareCount === 0) return null;
+  
+  return (
+    <button className="compare-floating-btn" onClick={() => setIsCompareOpen(true)}>
+      <span className="compare-icon">📊</span>
+      <span className="compare-count">{compareCount}</span>
+      <span className="compare-text">เปรียบเทียบ</span>
+    </button>
   );
 }
 
@@ -4518,6 +4861,7 @@ function App() {
     <ThemeProvider>
       <CurrencyProvider>
       <AuthProvider>
+      <CompareProvider>
       <CartProvider>
       <WishlistProvider>
         <div className="app">
@@ -4573,10 +4917,13 @@ function App() {
           <WishlistSidebar />
           <AuthModal />
           <CheckoutModal />
+          <ProductCompareModal />
+          <CompareFloatingButton />
           <Toast />
         </div>
       </WishlistProvider>
       </CartProvider>
+      </CompareProvider>
       </AuthProvider>
       </CurrencyProvider>
     </ThemeProvider>
