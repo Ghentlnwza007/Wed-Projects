@@ -1762,6 +1762,7 @@ function ProductCard({ product }) {
   const { isLoggedIn, openAuthModal } = useContext(AuthContext);
   const { formatPrice } = useContext(CurrencyContext);
   const [showSizeModal, setShowSizeModal] = useState(false);
+  const [showReviewModal, setShowReviewModal] = useState(false);
   const [selectedColorIndex, setSelectedColorIndex] = useState(0);
   
   const wishlisted = isInWishlist(product.id);
@@ -1844,9 +1845,14 @@ function ProductCard({ product }) {
             </li>
           </ul>
           <div className="product-price">{formatPrice(product.price)}</div>
-          <button className="add-to-cart" onClick={handleAddToCartClick}>
-            Add to Cart
-          </button>
+          <div className="product-actions">
+            <button className="add-to-cart" onClick={handleAddToCartClick}>
+              Add to Cart
+            </button>
+            <button className="review-btn" onClick={() => setShowReviewModal(true)} title="รีวิวสินค้า">
+              ⭐ Reviews
+            </button>
+          </div>
         </div>
       </div>
       
@@ -1857,9 +1863,17 @@ function ProductCard({ product }) {
           onAddToCart={addToCart}
         />
       )}
+      
+      {showReviewModal && (
+        <ReviewModal
+          product={{...product, image: currentImage}}
+          onClose={() => setShowReviewModal(false)}
+        />
+      )}
     </>
   );
 }
+
 
 // =============================================
 // PRODUCT MODAL COMPONENT
@@ -2069,6 +2083,733 @@ function WishlistSidebar() {
 }
 
 // =============================================
+// EDIT PROFILE FORM COMPONENT
+// =============================================
+function EditProfileForm({ user, onBack, onSave }) {
+  const [formData, setFormData] = useState({
+    firstName: user.firstName || '',
+    lastName: user.lastName || '',
+    phone: user.phone || '',
+    address: user.address || '',
+  });
+  const [saving, setSaving] = useState(false);
+  const [success, setSuccess] = useState(false);
+
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await onSave(formData);
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 2000);
+    } catch (error) {
+      console.error("Error saving:", error);
+    }
+    setSaving(false);
+  };
+
+  return (
+    <div className="auth-edit-profile">
+      <button className="auth-back" onClick={onBack}>← Back</button>
+      <h2 className="auth-title">แก้ไขข้อมูลส่วนตัว</h2>
+      
+      {success && <div className="auth-success">บันทึกข้อมูลเรียบร้อยแล้ว!</div>}
+      
+      <form onSubmit={handleSubmit} className="auth-form">
+        <div className="form-row">
+          <div className="form-group">
+            <label>ชื่อ</label>
+            <input
+              type="text"
+              name="firstName"
+              value={formData.firstName}
+              onChange={handleChange}
+              placeholder="ชื่อ"
+            />
+          </div>
+          <div className="form-group">
+            <label>นามสกุล</label>
+            <input
+              type="text"
+              name="lastName"
+              value={formData.lastName}
+              onChange={handleChange}
+              placeholder="นามสกุล"
+            />
+          </div>
+        </div>
+        
+        <div className="form-group">
+          <label>เบอร์โทรศัพท์</label>
+          <input
+            type="tel"
+            name="phone"
+            value={formData.phone}
+            onChange={handleChange}
+            placeholder="เบอร์โทรศัพท์"
+          />
+        </div>
+        
+        <div className="form-group">
+          <label>ที่อยู่จัดส่ง</label>
+          <textarea
+            name="address"
+            value={formData.address}
+            onChange={handleChange}
+            placeholder="ที่อยู่จัดส่ง"
+            rows="3"
+          />
+        </div>
+        
+        <button type="submit" className="auth-submit-btn" disabled={saving}>
+          {saving ? 'กำลังบันทึก...' : 'บันทึกข้อมูล'}
+        </button>
+      </form>
+    </div>
+  );
+}
+
+// =============================================
+// ORDER HISTORY COMPONENT
+// =============================================
+function OrderHistory({ userId }) {
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (userId) {
+      const unsubscribe = db.collection('orders')
+        .where('userId', '==', userId)
+        .orderBy('createdAt', 'desc')
+        .onSnapshot((snapshot) => {
+          const ordersData = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          setOrders(ordersData);
+          setLoading(false);
+        }, (error) => {
+          console.error("Error loading orders:", error);
+          setLoading(false);
+        });
+      
+      return () => unsubscribe();
+    }
+  }, [userId]);
+
+  const formatPrice = (price) => {
+    return new Intl.NumberFormat('th-TH', {
+      style: 'currency',
+      currency: 'THB'
+    }).format(price);
+  };
+
+  if (loading) {
+    return <div className="orders-loading">กำลังโหลด...</div>;
+  }
+
+  if (orders.length === 0) {
+    return (
+      <div className="orders-empty">
+        <div className="orders-empty-icon">📦</div>
+        <p>ยังไม่มีประวัติการสั่งซื้อ</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="orders-list">
+      {orders.map((order) => (
+        <div key={order.id} className="order-card">
+          <div className="order-header">
+            <div className="order-id">#{order.id.slice(-8).toUpperCase()}</div>
+            <div className={`order-status status-${order.status || 'pending'}`}>
+              {order.status === 'completed' ? 'สำเร็จ' : 
+               order.status === 'shipped' ? 'กำลังจัดส่ง' : 'รอดำเนินการ'}
+            </div>
+          </div>
+          <div className="order-date">
+            {order.createdAt ? new Date(order.createdAt.seconds * 1000).toLocaleDateString('th-TH', {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit'
+            }) : 'ไม่ระบุวันที่'}
+          </div>
+          <div className="order-items">
+            {order.items?.slice(0, 3).map((item, idx) => (
+              <span key={idx} className="order-item-name">{item.name}</span>
+            ))}
+            {order.items?.length > 3 && <span className="order-more">+{order.items.length - 3} รายการ</span>}
+          </div>
+          <div className="order-total">
+            รวม: <strong>{formatPrice(order.total)}</strong>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// =============================================
+// STAR RATING COMPONENT
+// =============================================
+function StarRating({ rating, onRatingChange, readonly = false, size = 24 }) {
+  const [hoverRating, setHoverRating] = useState(0);
+  
+  const handleClick = (value) => {
+    if (!readonly && onRatingChange) {
+      onRatingChange(value);
+    }
+  };
+  
+  return (
+    <div className={`star-rating ${readonly ? 'readonly' : ''}`}>
+      {[1, 2, 3, 4, 5].map((star) => (
+        <span
+          key={star}
+          className={`star ${star <= (hoverRating || rating) ? 'filled' : ''}`}
+          onClick={() => handleClick(star)}
+          onMouseEnter={() => !readonly && setHoverRating(star)}
+          onMouseLeave={() => !readonly && setHoverRating(0)}
+          style={{ fontSize: size, cursor: readonly ? 'default' : 'pointer' }}
+        >
+          ★
+        </span>
+      ))}
+    </div>
+  );
+}
+
+// =============================================
+// PRODUCT REVIEW FORM COMPONENT
+// =============================================
+function ProductReviewForm({ productId, productName, onSubmit, onCancel }) {
+  const { user } = useContext(AuthContext);
+  const [rating, setRating] = useState(0);
+  const [reviewText, setReviewText] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (rating === 0) {
+      setError('กรุณาให้คะแนนดาว');
+      return;
+    }
+    
+    if (reviewText.trim().length < 10) {
+      setError('กรุณาเขียนรีวิวอย่างน้อย 10 ตัวอักษร');
+      return;
+    }
+    
+    setSubmitting(true);
+    setError('');
+    
+    try {
+      const reviewData = {
+        productId,
+        productName,
+        userId: user.id,
+        userName: `${user.firstName} ${user.lastName?.charAt(0) || ''}.`,
+        rating,
+        reviewText: reviewText.trim(),
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      };
+      
+      await db.collection('reviews').add(reviewData);
+      
+      setRating(0);
+      setReviewText('');
+      if (onSubmit) onSubmit();
+    } catch (err) {
+      console.error("Error submitting review:", err);
+      setError('เกิดข้อผิดพลาดในการส่งรีวิว');
+    }
+    
+    setSubmitting(false);
+  };
+  
+  return (
+    <div className="review-form">
+      <h4 className="review-form-title">เขียนรีวิวสินค้า</h4>
+      
+      {error && <div className="review-error">{error}</div>}
+      
+      <form onSubmit={handleSubmit}>
+        <div className="review-rating-section">
+          <label>ให้คะแนน:</label>
+          <StarRating rating={rating} onRatingChange={setRating} size={28} />
+        </div>
+        
+        <div className="review-text-section">
+          <label>รีวิวของคุณ:</label>
+          <textarea
+            value={reviewText}
+            onChange={(e) => setReviewText(e.target.value)}
+            placeholder="แชร์ประสบการณ์การใช้สินค้านี้..."
+            rows="4"
+            maxLength="500"
+          />
+          <span className="char-count">{reviewText.length}/500</span>
+        </div>
+        
+        <div className="review-form-actions">
+          <button type="button" className="review-cancel-btn" onClick={onCancel}>
+            ยกเลิก
+          </button>
+          <button type="submit" className="review-submit-btn" disabled={submitting}>
+            {submitting ? 'กำลังส่ง...' : 'ส่งรีวิว'}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+// =============================================
+// PRODUCT REVIEWS DISPLAY COMPONENT
+// =============================================
+function ProductReviews({ productId }) {
+  const [reviews, setReviews] = useState([]);
+  const [loading, setLoading] = useState(true);
+  
+  useEffect(() => {
+    if (productId) {
+      const unsubscribe = db.collection('reviews')
+        .where('productId', '==', productId)
+        .orderBy('createdAt', 'desc')
+        .limit(10)
+        .onSnapshot((snapshot) => {
+          const reviewsData = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          setReviews(reviewsData);
+          setLoading(false);
+        }, (error) => {
+          console.error("Error loading reviews:", error);
+          setLoading(false);
+        });
+      
+      return () => unsubscribe();
+    }
+  }, [productId]);
+  
+  const averageRating = reviews.length > 0 
+    ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1)
+    : 0;
+  
+  if (loading) {
+    return <div className="reviews-loading">กำลังโหลดรีวิว...</div>;
+  }
+  
+  return (
+    <div className="product-reviews">
+      <div className="reviews-summary">
+        <div className="average-rating">
+          <span className="rating-number">{averageRating}</span>
+          <StarRating rating={Math.round(averageRating)} readonly size={20} />
+          <span className="review-count">({reviews.length} รีวิว)</span>
+        </div>
+      </div>
+      
+      {reviews.length === 0 ? (
+        <div className="no-reviews">
+          <p>ยังไม่มีรีวิวสำหรับสินค้านี้</p>
+          <p className="no-reviews-hint">เป็นคนแรกที่รีวิว!</p>
+        </div>
+      ) : (
+        <div className="reviews-list">
+          {reviews.map((review) => (
+            <div key={review.id} className="review-card">
+              <div className="review-header">
+                <div className="reviewer-info">
+                  <span className="reviewer-name">{review.userName}</span>
+                  <StarRating rating={review.rating} readonly size={16} />
+                </div>
+                <span className="review-date">
+                  {review.createdAt ? new Date(review.createdAt.seconds * 1000).toLocaleDateString('th-TH', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric'
+                  }) : ''}
+                </span>
+              </div>
+              <p className="review-text">{review.reviewText}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// =============================================
+// REVIEW MODAL COMPONENT
+// =============================================
+function ReviewModal({ product, onClose }) {
+  const { user, isLoggedIn, openAuthModal } = useContext(AuthContext);
+  const [showForm, setShowForm] = useState(false);
+  
+  const handleOverlayClick = (e) => {
+    if (e.target.classList.contains("review-modal-overlay")) {
+      onClose();
+    }
+  };
+  
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handleEscape);
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", handleEscape);
+      document.body.style.overflow = "auto";
+    };
+  }, [onClose]);
+  
+  return (
+    <div className="review-modal-overlay active" onClick={handleOverlayClick}>
+      <div className="review-modal">
+        <button className="review-modal-close" onClick={onClose}>×</button>
+        
+        <div className="review-modal-header">
+          <img src={product.image || product.images?.[0]} alt={product.name} className="review-product-image" />
+          <div className="review-product-info">
+            <h3>{product.name}</h3>
+          </div>
+        </div>
+        
+        {showForm && isLoggedIn ? (
+          <ProductReviewForm 
+            productId={product.id}
+            productName={product.name}
+            onSubmit={() => setShowForm(false)}
+            onCancel={() => setShowForm(false)}
+          />
+        ) : (
+          <>
+            <ProductReviews productId={product.id} />
+            <div className="review-modal-actions">
+              {isLoggedIn ? (
+                <button className="write-review-btn" onClick={() => setShowForm(true)}>
+                  ✏️ เขียนรีวิว
+                </button>
+              ) : (
+                <button className="write-review-btn" onClick={() => openAuthModal('login')}>
+                  เข้าสู่ระบบเพื่อเขียนรีวิว
+                </button>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// =============================================
+// ADMIN ADD PRODUCT FORM COMPONENT
+// =============================================
+function AdminAddProduct({ onBack, onSuccess }) {
+  const [formData, setFormData] = useState({
+    name: '',
+    price: '',
+    model: '',
+    size: 'S, M, L, XL',
+    material: '',
+    color: '',
+    stock: '10',
+    image: '',
+    collection: 'men'
+  });
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
+  
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+  
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!formData.name || !formData.price || !formData.image) {
+      setError('กรุณากรอกชื่อ, ราคา และ URL รูปภาพ');
+      return;
+    }
+    
+    setSubmitting(true);
+    setError('');
+    
+    try {
+      const productData = {
+        name: formData.name,
+        price: parseFloat(formData.price),
+        model: formData.model || formData.name,
+        size: formData.size,
+        material: formData.material || 'Mixed Materials',
+        color: formData.color || 'Various',
+        stock: parseInt(formData.stock) || 10,
+        image: formData.image,
+        collection: formData.collection,
+        colorVariants: [
+          { name: formData.color || 'Default', hex: '#888888', image: formData.image }
+        ],
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      };
+      
+      await db.collection('products').add(productData);
+      
+      setSuccess(true);
+      setFormData({
+        name: '',
+        price: '',
+        model: '',
+        size: 'S, M, L, XL',
+        material: '',
+        color: '',
+        stock: '10',
+        image: '',
+        collection: 'men'
+      });
+      
+      setTimeout(() => {
+        setSuccess(false);
+        if (onSuccess) onSuccess();
+      }, 2000);
+    } catch (err) {
+      console.error("Error adding product:", err);
+      setError('เกิดข้อผิดพลาดในการเพิ่มสินค้า');
+    }
+    
+    setSubmitting(false);
+  };
+  
+  return (
+    <div className="admin-add-product">
+      <button className="auth-back" onClick={onBack}>← กลับ</button>
+      <h2 className="admin-title">➕ เพิ่มสินค้าใหม่</h2>
+      
+      {error && <div className="admin-error">{error}</div>}
+      {success && <div className="admin-success">✓ เพิ่มสินค้าสำเร็จ!</div>}
+      
+      <form onSubmit={handleSubmit} className="admin-product-form">
+        <div className="form-group">
+          <label>ชื่อสินค้า *</label>
+          <input
+            type="text"
+            name="name"
+            value={formData.name}
+            onChange={handleChange}
+            placeholder="ชื่อสินค้า"
+          />
+        </div>
+        
+        <div className="form-row">
+          <div className="form-group">
+            <label>ราคา (บาท) *</label>
+            <input
+              type="number"
+              name="price"
+              value={formData.price}
+              onChange={handleChange}
+              placeholder="1990.00"
+              step="0.01"
+            />
+          </div>
+          <div className="form-group">
+            <label>จำนวนในสต็อก</label>
+            <input
+              type="number"
+              name="stock"
+              value={formData.stock}
+              onChange={handleChange}
+              placeholder="10"
+            />
+          </div>
+        </div>
+        
+        <div className="form-group">
+          <label>รุ่น / Model</label>
+          <input
+            type="text"
+            name="model"
+            value={formData.model}
+            onChange={handleChange}
+            placeholder="รุ่นสินค้า"
+          />
+        </div>
+        
+        <div className="form-row">
+          <div className="form-group">
+            <label>ไซส์</label>
+            <input
+              type="text"
+              name="size"
+              value={formData.size}
+              onChange={handleChange}
+              placeholder="S, M, L, XL"
+            />
+          </div>
+          <div className="form-group">
+            <label>สี</label>
+            <input
+              type="text"
+              name="color"
+              value={formData.color}
+              onChange={handleChange}
+              placeholder="Black, White"
+            />
+          </div>
+        </div>
+        
+        <div className="form-group">
+          <label>วัสดุ</label>
+          <input
+            type="text"
+            name="material"
+            value={formData.material}
+            onChange={handleChange}
+            placeholder="100% Cotton"
+          />
+        </div>
+        
+        <div className="form-group">
+          <label>URL รูปภาพ *</label>
+          <input
+            type="url"
+            name="image"
+            value={formData.image}
+            onChange={handleChange}
+            placeholder="https://..."
+          />
+          {formData.image && (
+            <div className="image-preview">
+              <img src={formData.image} alt="Preview" onError={(e) => e.target.style.display = 'none'} />
+            </div>
+          )}
+        </div>
+        
+        <div className="form-group">
+          <label>เลือก Collection *</label>
+          <select name="collection" value={formData.collection} onChange={handleChange}>
+            <option value="men">Men's Collection</option>
+            <option value="women">Women's Collection</option>
+            <option value="unisex">Unisex Collection</option>
+          </select>
+        </div>
+        
+        <button type="submit" className="admin-submit-btn" disabled={submitting}>
+          {submitting ? 'กำลังเพิ่ม...' : '➕ เพิ่มสินค้า'}
+        </button>
+      </form>
+    </div>
+  );
+}
+
+// =============================================
+// ADMIN PANEL COMPONENT
+// =============================================
+function AdminPanel({ onBack }) {
+  const [view, setView] = useState('menu'); // 'menu', 'add', 'list'
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(false);
+  
+  const loadProducts = () => {
+    setLoading(true);
+    db.collection('products')
+      .orderBy('createdAt', 'desc')
+      .limit(20)
+      .get()
+      .then((snapshot) => {
+        const productsData = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setProducts(productsData);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("Error loading products:", err);
+        setLoading(false);
+      });
+  };
+  
+  const deleteProduct = async (productId) => {
+    if (window.confirm('ต้องการลบสินค้านี้?')) {
+      try {
+        await db.collection('products').doc(productId).delete();
+        setProducts(products.filter(p => p.id !== productId));
+      } catch (err) {
+        console.error("Error deleting product:", err);
+      }
+    }
+  };
+  
+  if (view === 'add') {
+    return <AdminAddProduct onBack={() => setView('menu')} onSuccess={() => setView('menu')} />;
+  }
+  
+  if (view === 'list') {
+    return (
+      <div className="admin-product-list">
+        <button className="auth-back" onClick={() => setView('menu')}>← กลับ</button>
+        <h2 className="admin-title">📦 สินค้าที่เพิ่มจาก Admin</h2>
+        
+        {loading ? (
+          <div className="admin-loading">กำลังโหลด...</div>
+        ) : products.length === 0 ? (
+          <div className="admin-empty">ยังไม่มีสินค้าที่เพิ่มจาก Admin</div>
+        ) : (
+          <div className="admin-products-grid">
+            {products.map((product) => (
+              <div key={product.id} className="admin-product-card">
+                <img src={product.image} alt={product.name} />
+                <div className="admin-product-info">
+                  <h4>{product.name}</h4>
+                  <p className="admin-product-price">฿{product.price?.toLocaleString()}</p>
+                  <p className="admin-product-collection">{product.collection}</p>
+                </div>
+                <button className="admin-delete-btn" onClick={() => deleteProduct(product.id)}>
+                  🗑️
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+  
+  return (
+    <div className="admin-panel">
+      <button className="auth-back" onClick={onBack}>← กลับ</button>
+      <h2 className="admin-title">🔧 Admin Panel</h2>
+      
+      <div className="admin-menu">
+        <button className="admin-menu-btn" onClick={() => setView('add')}>
+          <span className="admin-menu-icon">➕</span>
+          <span className="admin-menu-text">เพิ่มสินค้าใหม่</span>
+        </button>
+        <button className="admin-menu-btn" onClick={() => { setView('list'); loadProducts(); }}>
+          <span className="admin-menu-icon">📦</span>
+          <span className="admin-menu-text">ดูสินค้าที่เพิ่ม</span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// =============================================
 // AUTH MODAL COMPONENT
 // =============================================
 function AuthModal() {
@@ -2231,9 +2972,22 @@ function AuthModal() {
               <p className="profile-email">{user.email}</p>
             </div>
             
-            <div className="profile-details">
-              <h3 className="profile-section-title">ข้อมูลส่วนตัว</h3>
-              
+            <div className="profile-tabs">
+              <button className="profile-tab active" onClick={(e) => {
+                e.target.parentElement.querySelectorAll('.profile-tab').forEach(t => t.classList.remove('active'));
+                e.target.classList.add('active');
+                document.getElementById('profile-info').style.display = 'block';
+                document.getElementById('profile-orders').style.display = 'none';
+              }}>ข้อมูลส่วนตัว</button>
+              <button className="profile-tab" onClick={(e) => {
+                e.target.parentElement.querySelectorAll('.profile-tab').forEach(t => t.classList.remove('active'));
+                e.target.classList.add('active');
+                document.getElementById('profile-info').style.display = 'none';
+                document.getElementById('profile-orders').style.display = 'block';
+              }}>ประวัติการสั่งซื้อ</button>
+            </div>
+            
+            <div id="profile-info" className="profile-details">
               <div className="profile-item">
                 <span className="profile-label">ชื่อ-นามสกุล</span>
                 <span className="profile-value">{user.firstName} {user.lastName}</span>
@@ -2244,19 +2998,15 @@ function AuthModal() {
                 <span className="profile-value">{user.email}</span>
               </div>
               
-              {user.phone && (
-                <div className="profile-item">
-                  <span className="profile-label">เบอร์โทรศัพท์</span>
-                  <span className="profile-value">{user.phone}</span>
-                </div>
-              )}
+              <div className="profile-item">
+                <span className="profile-label">เบอร์โทรศัพท์</span>
+                <span className="profile-value">{user.phone || 'ไม่ได้ระบุ'}</span>
+              </div>
               
-              {user.address && (
-                <div className="profile-item">
-                  <span className="profile-label">ที่อยู่จัดส่ง</span>
-                  <span className="profile-value">{user.address}</span>
-                </div>
-              )}
+              <div className="profile-item">
+                <span className="profile-label">ที่อยู่จัดส่ง</span>
+                <span className="profile-value">{user.address || 'ไม่ได้ระบุ'}</span>
+              </div>
               
               {user.username && (
                 <div className="profile-item">
@@ -2275,9 +3025,28 @@ function AuthModal() {
                   }) : 'ไม่ระบุ'}
                 </span>
               </div>
+              
+              <button className="auth-btn edit-profile-btn" onClick={() => setAuthMode('editProfile')}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                </svg>
+                แก้ไขข้อมูล
+              </button>
+            </div>
+            
+            <div id="profile-orders" className="profile-orders" style={{display: 'none'}}>
+              <OrderHistory userId={user.id} />
             </div>
             
             <div className="profile-actions">
+              <button className="auth-btn admin-btn" onClick={() => setAuthMode('admin')}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="3"/>
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                </svg>
+                Admin Panel
+              </button>
               <button className="auth-btn logout-btn" onClick={logout}>
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
@@ -2288,6 +3057,23 @@ function AuthModal() {
               </button>
             </div>
           </div>
+        )}
+
+        {/* Edit Profile View */}
+        {authMode === 'editProfile' && isLoggedIn && (
+          <EditProfileForm user={user} onBack={() => setAuthMode('profile')} onSave={async (updatedData) => {
+            try {
+              await db.collection('users').doc(user.id).update(updatedData);
+              // Refresh user data
+              const userDoc = await db.collection('users').doc(user.id).get();
+              if (userDoc.exists) {
+                // Update will be reflected through auth state listener
+              }
+              setAuthMode('profile');
+            } catch (error) {
+              console.error("Error updating profile:", error);
+            }
+          }} />
         )}
 
         {/* Login View */}
@@ -2493,6 +3279,11 @@ function AuthModal() {
             </p>
           </div>
         )}
+
+        {/* Admin View */}
+        {authMode === 'admin' && isLoggedIn && (
+          <AdminPanel onBack={() => setAuthMode('profile')} />
+        )}
       </div>
     </div>
   );
@@ -2523,18 +3314,32 @@ function CheckoutModal() {
     isCheckoutOpen, 
     setIsCheckoutOpen 
   } = useContext(CartContext);
+  const { user } = useContext(AuthContext);
   
   const [step, setStep] = useState(1); // 1: shipping, 2: payment, 3: success
   const [paymentMethod, setPaymentMethod] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [orderNumber, setOrderNumber] = useState('');
   
+  // Coupon system
+  const [couponCode, setCouponCode] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [couponError, setCouponError] = useState('');
+  
+  const availableCoupons = {
+    'WELCOME10': { type: 'percent', value: 10, description: 'ส่วนลด 10%' },
+    'MAISON20': { type: 'percent', value: 20, description: 'ส่วนลด 20%' },
+    'FREESHIP': { type: 'shipping', value: 0, description: 'ฟรีค่าจัดส่ง' },
+    'SAVE100': { type: 'fixed', value: 100, description: 'ลด 100 บาท' },
+    'SAVE500': { type: 'fixed', value: 500, description: 'ลด 500 บาท' },
+  };
+  
   const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
-    phone: '',
-    email: '',
-    address: '',
+    firstName: user?.firstName || '',
+    lastName: user?.lastName || '',
+    phone: user?.phone || '',
+    email: user?.email || '',
+    address: user?.address || '',
     notes: '',
     cardNumber: '',
     cardExpiry: '',
@@ -2544,15 +3349,44 @@ function CheckoutModal() {
   
   const [errors, setErrors] = useState({});
 
-  const shippingCost = cartTotal > 2000 ? 0 : 150;
-  const discount = cartTotal > 5000 ? 500 : 0;
-  const finalTotal = cartTotal + shippingCost - discount;
+  // Calculate costs
+  const shippingCost = appliedCoupon?.type === 'shipping' ? 0 : (cartTotal > 2000 ? 0 : 150);
+  
+  const couponDiscount = appliedCoupon ? 
+    (appliedCoupon.type === 'percent' ? cartTotal * (appliedCoupon.value / 100) :
+     appliedCoupon.type === 'fixed' ? appliedCoupon.value : 0) : 0;
+     
+  const autoDiscount = cartTotal > 5000 ? 500 : 0;
+  const totalDiscount = couponDiscount + autoDiscount;
+  const finalTotal = Math.max(0, cartTotal + shippingCost - totalDiscount);
 
   const formatPrice = (price) => {
     return new Intl.NumberFormat('th-TH', {
       style: 'currency',
       currency: 'THB',
     }).format(price);
+  };
+
+  const applyCoupon = () => {
+    const code = couponCode.toUpperCase().trim();
+    if (!code) {
+      setCouponError('กรุณากรอกรหัสคูปอง');
+      return;
+    }
+    if (availableCoupons[code]) {
+      setAppliedCoupon({ code, ...availableCoupons[code] });
+      setCouponError('');
+      setCouponCode('');
+    } else {
+      setCouponError('รหัสคูปองไม่ถูกต้อง');
+      setAppliedCoupon(null);
+    }
+  };
+
+  const removeCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponCode('');
+    setCouponError('');
   };
 
   const handleChange = (e) => {
@@ -2607,14 +3441,53 @@ function CheckoutModal() {
 
   const processOrder = async () => {
     setIsProcessing(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 2000));
     
-    const newOrderNumber = 'ORD-' + Date.now().toString().slice(-8);
-    setOrderNumber(newOrderNumber);
-    setIsProcessing(false);
-    setStep(3);
-    clearCart();
+    try {
+      // Create order data
+      const orderData = {
+        userId: user?.id || 'guest',
+        items: cart.map(item => ({
+          id: item.id,
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity,
+          size: item.selectedSize,
+          image: item.image
+        })),
+        subtotal: cartTotal,
+        shipping: shippingCost,
+        discount: totalDiscount,
+        coupon: appliedCoupon?.code || null,
+        total: finalTotal,
+        paymentMethod: paymentMethod,
+        shippingAddress: {
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          phone: formData.phone,
+          email: formData.email,
+          address: formData.address,
+          notes: formData.notes
+        },
+        status: 'pending',
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      };
+
+      // Save to Firestore
+      const orderRef = await db.collection('orders').add(orderData);
+      
+      setOrderNumber(orderRef.id.slice(-8).toUpperCase());
+      setIsProcessing(false);
+      setStep(3);
+      clearCart();
+    } catch (error) {
+      console.error("Error creating order:", error);
+      setIsProcessing(false);
+      // Fallback to local order number if Firestore fails
+      const newOrderNumber = 'ORD-' + Date.now().toString().slice(-8);
+      setOrderNumber(newOrderNumber);
+      setStep(3);
+      clearCart();
+    }
   };
 
   const handleClose = () => {
