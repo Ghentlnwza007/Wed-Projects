@@ -438,6 +438,104 @@ const collections = {
       },
     ],
   },
+  sports: {
+    title: "Sports & Lifestyle",
+    description: "คอลเลคชั่นสปอร์ตและไลฟ์สไตล์",
+    image:
+      "https://backend.liverpoolfc.com/sites/default/files/styles/lg/public/2025-08/lfc-adidas-kit-players-gallery-290725-_%285%29_aa98730959953c4ca02084644878a82b.webp?itok=E8bSx0tx&width=1680",
+    products: [
+      {
+        id: 301,
+        name: "Premium Running Sneakers",
+        price: 4990.00,
+        model: "Air Flow X",
+        size: "39, 40, 41, 42, 43, 44",
+        material: "Mesh & Synthetic",
+        color: "White/Black, Red/White",
+        stock: 15,
+        image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800",
+        colorVariants: [
+          { name: "White/Black", hex: "#ffffff", image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800" },
+          { name: "Red/White", hex: "#e53935", image: "https://images.unsplash.com/photo-1608231387042-66d1773070a5?w=800" },
+        ],
+        tag: "NEW",
+      },
+      {
+        id: 302,
+        name: "Athletic Performance Hoodie",
+        price: 2490.00,
+        model: "Comfort Fit",
+        size: "S, M, L, XL, XXL",
+        material: "Cotton Blend with DryFit",
+        color: "Black, Gray, Navy",
+        stock: 20,
+        image: "https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=800",
+        colorVariants: [
+          { name: "Black", hex: "#212121", image: "https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=800" },
+          { name: "Gray", hex: "#9e9e9e", image: "https://images.unsplash.com/photo-1620799140408-edc6dcb6d633?w=800" },
+        ],
+      },
+      {
+        id: 303,
+        name: "Premium Jogger Pants",
+        price: 1890.00,
+        model: "Flex Motion",
+        size: "S, M, L, XL",
+        material: "Stretch Cotton",
+        color: "Black, Olive",
+        stock: 18,
+        image: "https://images.unsplash.com/photo-1552902865-b72c031ac5ea?w=800",
+        colorVariants: [
+          { name: "Black", hex: "#212121", image: "https://images.unsplash.com/photo-1552902865-b72c031ac5ea?w=800" },
+          { name: "Olive", hex: "#6d7c4e", image: "https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?w=800" },
+        ],
+      },
+      {
+        id: 304,
+        name: "Sports Duffle Bag",
+        price: 2290.00,
+        model: "Gym Essential",
+        size: "50x30x25 cm",
+        material: "Durable Nylon",
+        color: "Black, Navy",
+        stock: 12,
+        image: "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=800",
+        colorVariants: [
+          { name: "Black", hex: "#212121", image: "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=800" },
+        ],
+      },
+      {
+        id: 305,
+        name: "Training Tank Top",
+        price: 890.00,
+        model: "Breathe Tech",
+        size: "S, M, L, XL",
+        material: "Quick-Dry Polyester",
+        color: "White, Black, Blue",
+        stock: 25,
+        image: "https://images.unsplash.com/photo-1571902943202-507ec2618e8f?w=800",
+        colorVariants: [
+          { name: "White", hex: "#ffffff", image: "https://images.unsplash.com/photo-1571902943202-507ec2618e8f?w=800" },
+          { name: "Black", hex: "#212121", image: "https://images.unsplash.com/photo-1618354691373-d851c5c3a990?w=800" },
+        ],
+        tag: "HOT",
+      },
+      {
+        id: 306,
+        name: "Performance Compression Shorts",
+        price: 1290.00,
+        model: "Pro Stretch",
+        size: "S, M, L, XL",
+        material: "Spandex Blend",
+        color: "Black, Gray",
+        stock: 20,
+        image: "https://images.unsplash.com/photo-1591195853828-11db59a44f6b?w=800",
+        colorVariants: [
+          { name: "Black", hex: "#212121", image: "https://images.unsplash.com/photo-1591195853828-11db59a44f6b?w=800" },
+        ],
+      },
+    ],
+  },
 };
 
 // =============================================
@@ -1961,8 +2059,37 @@ function ProductCard({ product }) {
 // =============================================
 function ProductModal({ collectionKey, onClose }) {
   const collection = collections[collectionKey];
+  const [firestoreProducts, setFirestoreProducts] = useState([]);
+
+  // Load products from Firestore for this collection
+  useEffect(() => {
+    const loadFirestoreProducts = async () => {
+      try {
+        const snapshot = await db.collection('products')
+          .where('collection', '==', collectionKey)
+          .get();
+        const products = snapshot.docs.map(doc => ({
+          id: `fs-${doc.id}`,
+          ...doc.data(),
+          model: doc.data().model || doc.data().name,
+          colorVariants: doc.data().colorVariants || [
+            { name: doc.data().color || 'Default', hex: '#888888', image: doc.data().image }
+          ]
+        }));
+        setFirestoreProducts(products);
+      } catch (error) {
+        console.log("Error loading Firestore products:", error);
+      }
+    };
+    if (collectionKey) {
+      loadFirestoreProducts();
+    }
+  }, [collectionKey]);
 
   if (!collection) return null;
+
+  // Combine hardcoded products with Firestore products
+  const allProducts = [...collection.products, ...firestoreProducts];
 
   const handleOverlayClick = (e) => {
     if (e.target.classList.contains("modal-overlay")) {
@@ -1995,7 +2122,7 @@ function ProductModal({ collectionKey, onClose }) {
           </button>
         </div>
         <div className="products-grid">
-          {collection.products.map((product) => (
+          {allProducts.map((product) => (
             <ProductCard key={product.id} product={product} />
           ))}
         </div>
@@ -3568,6 +3695,7 @@ function AdminAddProduct({ onBack, onSuccess }) {
     size: 'S, M, L, XL',
     material: '',
     color: '',
+    colorHex: '#3498db',
     stock: '10',
     image: '',
     collection: 'men'
@@ -3603,7 +3731,7 @@ function AdminAddProduct({ onBack, onSuccess }) {
         image: formData.image,
         collection: formData.collection,
         colorVariants: [
-          { name: formData.color || 'Default', hex: '#888888', image: formData.image }
+          { name: formData.color || 'Default', hex: formData.colorHex || '#888888', image: formData.image }
         ],
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       };
@@ -3618,6 +3746,7 @@ function AdminAddProduct({ onBack, onSuccess }) {
         size: 'S, M, L, XL',
         material: '',
         color: '',
+        colorHex: '#3498db',
         stock: '10',
         image: '',
         collection: 'men'
@@ -3702,14 +3831,41 @@ function AdminAddProduct({ onBack, onSuccess }) {
             />
           </div>
           <div className="form-group">
-            <label>สี</label>
+            <label>ชื่อสี</label>
             <input
               type="text"
               name="color"
               value={formData.color}
               onChange={handleChange}
-              placeholder="Black, White"
+              placeholder="White / Clear Blue"
             />
+          </div>
+        </div>
+        
+        <div className="form-row">
+          <div className="form-group">
+            <label>เลือกสี (สำหรับวงกลมสี)</label>
+            <div className="color-picker-wrapper">
+              <input
+                type="color"
+                name="colorHex"
+                value={formData.colorHex}
+                onChange={handleChange}
+                className="color-picker-input"
+              />
+              <input
+                type="text"
+                name="colorHex"
+                value={formData.colorHex}
+                onChange={handleChange}
+                placeholder="#3498db"
+                className="color-hex-input"
+              />
+              <div 
+                className="color-preview" 
+                style={{ backgroundColor: formData.colorHex }}
+              ></div>
+            </div>
           </div>
         </div>
         
@@ -3746,6 +3902,7 @@ function AdminAddProduct({ onBack, onSuccess }) {
             <option value="men">Men's Collection</option>
             <option value="women">Women's Collection</option>
             <option value="unisex">Unisex Collection</option>
+            <option value="sports">Sports & Lifestyle</option>
           </select>
         </div>
         
@@ -5385,6 +5542,25 @@ function ProductGallery({ onBack, initialSearchTerm = '', initialCategory = 'all
   const [searchTerm, setSearchTerm] = useState(initialSearchTerm);
   const [sortBy, setSortBy] = useState("default");
   const [selectedProduct, setSelectedProduct] = useState(null);
+  const [firestoreProducts, setFirestoreProducts] = useState([]);
+
+  // Load products from Firestore (added via Admin Panel)
+  useEffect(() => {
+    const loadFirestoreProducts = async () => {
+      try {
+        const snapshot = await db.collection('products').get();
+        const products = snapshot.docs.map(doc => ({
+          id: `fs-${doc.id}`,
+          ...doc.data(),
+          category: doc.data().collection || 'unisex'
+        }));
+        setFirestoreProducts(products);
+      } catch (error) {
+        console.log("No Firestore products or error loading:", error);
+      }
+    };
+    loadFirestoreProducts();
+  }, []);
 
   // Update searchTerm when initialSearchTerm changes
   useEffect(() => {
@@ -5400,11 +5576,13 @@ function ProductGallery({ onBack, initialSearchTerm = '', initialCategory = 'all
     }
   }, [initialCategory]);
 
-  // Combine all products from all collections
+  // Combine all products from all collections + Firestore
   const allProducts = [
     ...collections.men.products.map((p) => ({ ...p, category: "men" })),
     ...collections.women.products.map((p) => ({ ...p, category: "women" })),
     ...collections.unisex.products.map((p) => ({ ...p, category: "unisex" })),
+    ...collections.sports.products.map((p) => ({ ...p, category: "sports" })),
+    ...firestoreProducts.map((p) => ({ ...p, model: p.model || p.name })),
   ];
 
   // Filter products
@@ -5446,6 +5624,11 @@ function ProductGallery({ onBack, initialSearchTerm = '', initialCategory = 'all
       key: "unisex",
       label: "Unisex",
       count: collections.unisex.products.length,
+    },
+    {
+      key: "sports",
+      label: "Sports",
+      count: collections.sports.products.length,
     },
   ];
 
@@ -5799,11 +5982,11 @@ function NavbarWithPages({ currentPage, onNavigate, onNavigateCategory, onShowSe
           href="#"
           onClick={(e) => {
             e.preventDefault();
-            setIsWishlistOpen(true);
+            onNavigateCategory("sports");
           }}
-          className="wishlist-link"
+          className="sports-link"
         >
-          ♥ WISHLIST
+          ⚡ SPORTS
         </a>
         <a href="#about">ABOUT US</a>
         <a
